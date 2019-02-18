@@ -1,0 +1,264 @@
+%% Assignment 2  
+% Matthew Lazarus 100962142
+
+%% Question 2: Conductive Elements
+% In this question, a grid is set up, with the left sided boundary set to 1V.
+% Two bottle-necks of conductivities different than the rest of the grid
+% are introduced. Using the maxtrix form of the problem (GV=F), the electrostatic potential
+% within the region is found and plotted. Additionally, the conducitivity,
+% electric field and currents are plotted as well.
+
+
+% Clear all previous variables, figures, etc, to ensure that the workspace
+% is clean. 
+clear all
+clearvars
+clearvars -GLOBAL
+close all
+
+%Repeat the calculations 16 times. The first time is for a), times 2-6 are
+%for b), times 7-11 are for c) and 12-16 are for d).
+for repeat = 1:16
+    %Set the length and width of the grid. 
+    L=160;
+    W=120;
+    %b) - Vary the size of the grid
+    if(repeat>1 && repeat <7)
+        L = (repeat-1)*40;
+        W = (repeat-1)*30;
+    end
+    Lb = L/5;
+    Wb = W/5;
+    %c) - vary the size of the bottle-necks
+    if(repeat>6&&repeat<12)
+        Lb = ceil(L/(repeat-4));
+        Wb = ceil(W/(repeat-4));
+    end
+
+    %Initialize the G,B and conductivity matrices. 
+    G = sparse(L*W,L*W);
+    B=zeros(L*W,1);
+    B(1:W,1)=1;
+    condMap = zeros(W,L);
+
+    %Populate the conductivity matrix. 
+    for lCount = 1:L
+        for wCount = 1:W
+            if(lCount < L/2 + Lb/2 && lCount > L/2 - Lb/2 &&...
+                    (wCount > W-Wb || wCount < Wb))
+                condMap( wCount,lCount) = 10^-2;
+               
+                %d) - Vary the conductivity of the bottle-necks
+                if(repeat>11)
+                    condMap( wCount,lCount) =10^(repeat-15);
+                end
+            else
+                condMap(wCount,lCount) = 1;
+            end
+        end
+    end
+
+    % Set the diagonal of the G matrix to 1. This value will be overwritten
+    % later if it is not a boundary condition. 
+    for count = 1:L*W
+        G(count,count)=1;
+    end
+
+    %%
+    % Loop through rows and columns, if not a boundary case, set the 
+    % gradient based on the sum of adjacent conductivies. 
+
+    for col = 1:L
+        if(col~=1 &&col~=L)
+            for row = 1:W  
+                n = row + (col -1)*W;
+                if(count~=1 && row ~=1 && row~=W)                
+                    rxBefore = (condMap(row,col) + condMap(row,col-1))/2.0;
+                    rxAfter = (condMap(row,col) + condMap(row,col+1))/2.0;
+                    ryBefore = (condMap(row,col) + condMap(row-1,col))/2.0;
+                    ryAfter = (condMap(row,col) + condMap(row+1,col))/2.0;
+
+                    nyBefore = n-1;
+                    nyAfter = n+1;
+                    nxBefore = row+(col-2)*W;
+                    nxAfter = row+col*W;
+                    G(n,n) = -(rxBefore+rxAfter+ryBefore+ryAfter); 
+                    G(n, nyBefore) =ryBefore;
+                    G(n, nyAfter)=ryAfter;
+                    G(n, nxBefore)=rxBefore;
+                    G(n, nxAfter) =rxAfter; 
+
+                elseif(row==1)
+                    %Special Case: Bottom of Grid
+                    rxBefore = (condMap(row,col) + condMap(row,col-1))/2.0;
+                    rxAfter = (condMap(row,col) + condMap(row,col+1))/2.0;
+                    ryAfter = (condMap(row,col) + condMap(row+1,col))/2.0;
+
+                    nyAfter = n+1;
+                    nxBefore = row+(col-2)*W;
+                    nxAfter = row+col*W;
+                    G(n,n) = -(rxBefore+rxAfter+ryAfter); 
+                    G(n, nyAfter)=ryAfter;
+                    G(n, nxBefore)=rxBefore;
+                    G(n, nxAfter) =rxAfter; 
+                    
+                elseif(row==W)
+                    %Special Case: Top of Grid
+                    rxBefore = (condMap(row,col) + condMap(row,col-1))/2.0;
+                    rxAfter = (condMap(row,col) + condMap(row,col+1))/2.0;
+                    ryBefore = (condMap(row,col) + condMap(row-1,col))/2.0;
+
+                    nyBefore = n-1;
+                    nxBefore = row+(col-2)*W;
+                    nxAfter = row+col*W;
+                    G(n,n) = -(rxBefore+rxAfter+ryBefore); 
+                    G(n, nyBefore) =ryBefore;
+                    G(n, nxBefore)=rxBefore;
+                    G(n, nxAfter) =rxAfter; 
+                end        
+            end
+        end
+    end 
+    V=G\B;
+
+    %Map the voltage to original grid.
+    voltMap = zeros(W,L);
+    for cols = 1:L
+        for rows = 1:W
+            n= rows+(cols-1)*W;
+            voltMap(rows,cols)=V(n);        
+        end
+    end
+    
+    %%
+    % Find the Electric field knowing $E=- \nabla V$
+    
+    [Ex, Ey]=gradient(voltMap);
+    Ex=-Ex;
+    Ey=-Ey;
+    
+    %%
+    % Find the current density knowing $J=\sigma E$
+    
+    Jx = condMap.*Ex;
+    Jy = condMap.*Ey;
+    
+    %Sum the currents at both contacts (edges), take the average to find
+    %the total. 
+    current1 = sum(Jx(:,1));
+    current2 = sum(Jx(:,L));
+    totalCurrent = (current1+current2)/2;
+    
+    %% Part A
+    % As calculated above, the total current through the contacts for L=160, W=120, Lb
+    % = 32 and Wb = 24 is 0.6235. Additionally, there is no observed
+    % difference between the currents at each contact. 
+    if(repeat==1)     
+        
+        %%
+        % The conductivity plot can be seen in the figure below. The two
+        % bottle-neck regions can be seen clearly.
+        
+        figure
+        surf(1:L,1:W,condMap)
+        xlabel('x')
+        ylabel('y')
+        zlabel('Conductivity')
+        title('Conductivity of Grid')
+        colorbar;
+        view(2)
+        
+        %%
+        % The plot of the electric potential can be seen in the figure below.
+        % The left contact is set to V=1, and there is an almost linear
+        % decrease up to the right contact, which is at V=0. This linearity is
+        % slightly disturbed due to the two bottle-neck regions. 
+        
+        figure
+        surf(1:L,1:W,voltMap)
+        xlabel('x')
+        ylabel('y')
+        zlabel('Voltage')
+        title('Electric Potential of Grid')
+        colorbar;
+        view(2)
+
+        %%
+        % The electric field can be seen in the figure below. The electric
+        % field is strongest in the bottle-neck regions.
+        
+        figure;
+        x = 1:L;
+        y=1:W;
+        quiver(x,y,Ex,Ey);
+        xlabel('x')
+        ylabel('y')
+        title('Electric Field of Rectangular Region')
+
+        %%
+        % Seen in the figure below is the current flow. It can be seen that
+        % the current flows around the bottle-neck regions. 
+        
+        figure;
+        quiver(x,y,Jx,Jy);
+        xlabel('x')
+        ylabel('y')
+        title('Current Flow of Rectangular Region') 
+        
+    %% Part B
+        % The current flow through the grid was calculated for various mesh
+        % densities (i.e. mesh sizes). As can be seen in the figure below 
+        % ("Effect of Mesh Size on Current"),
+        % as the size of the mesh increases, the current decreases. 
+        
+    elseif(repeat>1 && repeat<7)              
+        meshSize(repeat-1) = L*W;
+        currents_Mesh(repeat-1) = totalCurrent;
+        
+        if(repeat==6)
+            figure
+            plot(meshSize, currents_Mesh)
+            xlabel("Mesh Size (L*W)")
+            ylabel("Current")
+            title("Effect of Mesh Size on Current")
+        end
+        
+    %% Part C
+    % The current flow through the grid was calculated for multiple
+    % different bottle-neck sizes. As displayed in the figure below,
+    % ("Effect of Bottle-Neck Size on Current")
+    % the larger the bottle-neck, the smaller the current.  
+    
+    elseif(repeat>6&&repeat<12)
+                
+        currents_BN(repeat-6)=totalCurrent;
+        bnSize(repeat-6)=Lb*Wb;
+        if(repeat==11)
+            figure
+            plot(bnSize, currents_BN)
+            xlabel("Bottle-Neck Size (Lb*Wb)")
+            ylabel("Current")
+            title("Effect of Bottle-Neck Size on Current")
+        end
+        
+    %% Part D
+        % The current flowing through the region was calculated for a
+        % number of different bottle-neck conductivities. As shown in the
+        % figure below ("Effect of Bottle-Neck Conductivity on Current"),
+        % the greater the conductance of the bottle-neck
+        % regions, the greater the current. 
+        
+    else        
+        currents_Cond(repeat-11)=totalCurrent;
+        cond(repeat-11)=10^(repeat-15);
+        if(repeat==16)
+            figure
+            plot(cond,currents_Cond);
+            xlabel("Conductivity of Bottle-Neck")
+            ylabel("Current")
+            title("Effect of Bottle-Neck Conductivity on Current")
+        end        
+    end
+end
+
+
